@@ -131,15 +131,11 @@ def load_model_and_scaler():
     """
     # Try multiple possible paths for model files to improve portability
     model_paths = [
-        '/home/Jingle/data/model/朱正保/death_model.pkl',
-        './death_model.pkl',
-        './model/death_model.pkl'
+        './death_model.pkl'
     ]
     
     scaler_paths = [
-        '/home/Jingle/data/model/朱正保/scaler_model.pkl',
-        './scaler_model.pkl',
-        './model/scaler_model.pkl'
+        './scaler_model.pkl'
     ]
     
     # Load model
@@ -633,3 +629,4 @@ if __name__ == "__main__":
     # This is the main entry point for the Streamlit app
     # All the code above will be executed when running: streamlit run app2.py
     pass
+
