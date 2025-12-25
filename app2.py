@@ -371,7 +371,7 @@ if st.sidebar.button('Reset Inputs'):
 
 # Create two columns in the sidebar for better organization
 # Set a wider gap between columns to increase effective sidebar width
-col1, col2 = st.sidebar.columns([3, 3], gap="large")
+col1, col2 = st.sidebar.columns([5, 5], gap="large")
 
 input_values = {}
 
@@ -541,9 +541,6 @@ st.markdown("- Length/intensity: Magnitude of feature's influence")
 
 # Display SHAP force plot - shows feature contributions for this specific prediction
 try:
-    # Initialize SHAP JavaScript for interactive plots
-    shap.initjs()
-    
     # Validate that SHAP values match the number of features
     if shap_used.shape[1] != len(FEATURES):
         st.warning(f"SHAP values shape ({shap_used.shape[1]}) doesn't match feature count ({len(FEATURES)}). Using available features.")
@@ -566,7 +563,7 @@ try:
     plt.rcParams['axes.unicode_minus'] = False
     
     # Create a new figure with smaller size and constrained layout to avoid warnings
-    fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(5, 3), constrained_layout=True)
     
     try:
         # Create SHAP Explanation object for waterfall plot
