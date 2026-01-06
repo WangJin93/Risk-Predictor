@@ -70,26 +70,6 @@ plt.rcParams['font.family'] = 'SimHei'
 st.title("🩺 Mortality Risk Predictor")
 st.markdown("---")
 
-# Q&A section
-st.markdown("""
-**Q: What is this app?**
-
-A: This app offers a practical tool for assessing the prognosis of acute ischemic stroke. It is designed for patients aged ≥18 years who had ischemic stroke within 7 days of symptom onset.
-
-**Q: What does it do?**
-
-A: With the 8 features you provide, we will quickly estimate your risk of mortality after ischemic stroke and use clear charts to show how each feature affects the result.
-
-**Q: How do I use it?**
-
-A: Fill in the patient's clinical features and just wait two minutes.
-
-**Q: Can I trust the number?**
-
-A: The model trained on thousands of real records, but bodies vary. It's a reference, not a verdict—bring it to your doctor for discussion.
-""")
-st.markdown("---")
-
 # ==========================
 # Feature Definitions
 # ==========================
@@ -99,14 +79,14 @@ FEATURES = ['D-dimer', 'AG', 'Age', 'NIHSS', 'Time', 'WBC', 'NSE', 'Glucose']
 
 # Descriptions of each feature with units and clinical significance
 FEATURE_DESCRIPTIONS = {
-    'D-dimer': 'D-dimer, protein fragment produced by blood clot breakdown, marker of thrombosis',
-    'AG': 'The albumin to globulin ratio (AG), indicator of liver function, nutrition, and inflammation',
-    'Age': 'Patient age in years',
-    'NIHSS': 'NIHSS score, scale assessed for ischemic stroke severity',
-    'Time': 'assessment of pre-hospital delay and thrombolysis time window',
-    'WBC': 'WBC, non-specific marker of systemic infection and inflammation',
-    'NSE': 'Neuron-specific enolase (NSE), marker of neuronal damage and neurologic deficit',
-    'Glucose': 'Fasting blood glucose, marker of glucose metabolism'
+    'D-dimer': 'D-dimer, protein fragment produced by blood clot breakdown, marker of thrombosis (Range: 0.0-20.0 mg/L)',
+    'AG': 'AG, indicator of liver function, nutrition, and inflammation (Range: 0.0-25.0 %)',
+    'Age': 'Patient age in years (Range: 0-100 years)',
+    'NIHSS': 'NIHSS score, scale assessed for ischemic stroke severity (Range: 0-42)',
+    'Time': 'assessment of pre-hospital delay and thrombolysis time window (Range: 0-168 hours)',
+    'WBC': 'WBC, non-specific marker of systemic infection and inflammation (Range: 0.0-30.0 ×10^9/L)',
+    'NSE': 'NSE, marker of neuronal damage and neurologic deficit (Range: 0.0-100.0 ng/mL)',
+    'Glucose': 'Fasting blood glucose, marker of glucose metabolism (Range: 0.0-30.0 mmol/L)'
 }
 
 # Configuration for input widgets (type, range, default value, step, formatting)
@@ -358,247 +338,304 @@ def st_shap(plot, height=None):
     shap_html = f"<head>{shap.getjs()}</head><body>{plot.html()}</body>"
     components.html(shap_html, height=height)
 
-# Initialize session state for prediction trigger
+# Initialize session state for prediction trigger and reset flag
 if 'predict' not in st.session_state:
     st.session_state.predict = False
-
-# Sidebar: Input controls
-st.sidebar.header("Input Clinical Features")
-
-# Add a reset button using session state
 if 'reset' not in st.session_state:
     st.session_state.reset = False
 
-if st.sidebar.button('Reset Inputs'):
-    st.session_state.reset = True
-    st.session_state.predict = False
-    st.rerun()
+# Add page state management
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'input'  # Possible values: 'input', 'results'
 
-# Create two columns in the sidebar for better organization
-# Set a wider gap between columns to increase effective sidebar width
-col1, col2 = st.sidebar.columns([5, 5], gap="large")
+# Note: Removed explicit session state initialization for input fields to fix Streamlit warning
+# Streamlit automatically creates session state entries for widgets with key parameters
 
-input_values = {}
-
-# Group features into logical categories
-laboratory_features = ['D-dimer', 'AG', 'WBC', 'NSE', 'Glucose']
-clinical_features = ['Age', 'NIHSS', 'Time']
-
-# Add section headers
-st.sidebar.markdown("### Laboratory Results")
-for feature in laboratory_features:
-    cfg = FEATURE_CONFIGS[feature]
-    
-    # Define labels with specific units as required
-    if feature == 'D-dimer':
-        label = "D-dimer, mg/L"
-    elif feature == 'AG':
-        label = "The albumin to globulin ratio (AG), %"
-    elif feature == 'WBC':
-        label = "White blood cell count (WBC), 10^9/L"
-    elif feature == 'NSE':
-        label = "Neuron-specific enolase (NSE), ng/mL"
-    elif feature == 'Glucose':
-        label = "Fasting blood glucose, mmol/L"
-    else:
-        label = feature
-    
-    # Determine which column to place the feature in
-    with (col1 if feature in ['D-dimer', 'WBC', 'Glucose'] else col2):
-        if cfg['kind'] == 'float':
-            input_values[feature] = st.number_input(
-                label=label,
-                min_value=float(cfg['min']),
-                max_value=float(cfg['max']),
-                value=float(cfg['min']) if st.session_state.reset else float(cfg['min']),
-                step=float(cfg['step']),
-                format=cfg.get('fmt', "%.2f"),
-                help=FEATURE_DESCRIPTIONS[feature],
-                key=f"{feature}_input"
-            )
-        else:
-            input_values[feature] = st.number_input(
-                label=label,
-                min_value=int(cfg['min']),
-                max_value=int(cfg['max']),
-                value=int(cfg['min']) if st.session_state.reset else int(cfg['min']),
-                step=int(cfg['step']),
-                help=FEATURE_DESCRIPTIONS[feature],
-                key=f"{feature}_input"
-            )
-
-st.sidebar.markdown("### Clinical Information")
-for feature in clinical_features:
-    cfg = FEATURE_CONFIGS[feature]
-    
-    # Define labels with specific units as required
-    if feature == 'Age':
-        label = "Age, years"
-    elif feature == 'NIHSS':
-        label = "NIHSS score at baseline"
-    elif feature == 'Time':
-        label = "Time from onset to hospitalization, hours"
-    else:
-        label = feature
-    
-    with (col1 if feature in ['Age'] else col2):
-        if cfg['kind'] == 'float':
-            input_values[feature] = st.number_input(
-                label=label,
-                min_value=float(cfg['min']),
-                max_value=float(cfg['max']),
-                value=float(cfg['min']) if st.session_state.reset else float(cfg['min']),
-                step=float(cfg['step']),
-                format=cfg.get('fmt', "%.2f"),
-                help=FEATURE_DESCRIPTIONS[feature],
-                key=f"{feature}_input"
-            )
-        else:
-            input_values[feature] = st.number_input(
-                label=label,
-                min_value=int(cfg['min']),
-                max_value=int(cfg['max']),
-                value=int(cfg['min']) if st.session_state.reset else int(cfg['min']),
-                step=int(cfg['step']),
-                help=FEATURE_DESCRIPTIONS[feature],
-                key=f"{feature}_input"
-            )
-
-# Add predict button in sidebar
-st.sidebar.markdown("---")
-if st.sidebar.button("Predict", type="primary", use_container_width=True):
-    st.session_state.predict = True
-
-# Reset the reset flag after processing
-if st.session_state.reset:
-    st.session_state.reset = False
-
-# Create DataFrame from input values
-sample_df = pd.DataFrame([input_values], columns=FEATURES)
-
-# Load model and scaler
+# Load model and scaler at the beginning to ensure it's available for both pages
 model, scaler = load_model_and_scaler()
 if model is None:
     st.stop()
 
-# Only show prediction results if predict button was clicked
-if st.session_state.predict:
-    # Use a spinner to show processing status
-    with st.spinner('Processing input features and generating prediction...'):
-        # Preprocess features for prediction
-        X_model_df = preprocess_features(sample_df, model, scaler)
-        
-        # Generate SHAP explanations
-        base_value, shap_used = generate_shap_explanations(model, X_model_df, sample_df)
+# Page routing logic
+if st.session_state.current_page == 'input':
+    # Q&A section - only show on input page
+    st.markdown("""
+    **Q: What is this app?**
 
-    # Make prediction and display results
-    st.subheader("Prediction Result")
-    
-    try:
-        # Validate model has predict_proba method
-        if not hasattr(model, 'predict_proba'):
-            # Fallback for models without predict_proba (e.g., some SVMs)
-            prediction = model.predict(X_model_df)[0]
-            mortality_prob = 100.0 if prediction == 1 else 0.0
-            st.warning("Model doesn't support probability prediction. Showing binary result.")
-        else:
-            proba = model.predict_proba(X_model_df)[0]
-            if len(proba) < 2:
-                st.error("Model prediction output format is unexpected. Expected at least 2 classes.")
-                st.stop()
-            mortality_prob = float(proba[1]) * 100.0
-        
-        # Ensure probability is within valid range
-        mortality_prob = max(0.0, min(100.0, mortality_prob))
-        
-        # Display results according to new layout requirements
-        st.markdown(f"**Based on feature values, your predicted possiblity of mortality after ischemic stroke is {mortality_prob:.2f}%.**")
-        
-        # Add risk assessment message based on probability
-        if mortality_prob >= 50:
-            st.markdown("**You may have a high risk of mortality after ischemic stroke—seek medical help immediately and ensure close monitoring!**")
-        else:
-            st.markdown("**Congratulations—your risk of mortality is low. Please continue to follow your doctor's rehabilitation plan closely!**")
-        
-    except Exception as e:
-        st.error(f"Prediction failed: {e}")
-        st.stop()
+    A: This app offers a practical tool for assessing the prognosis of acute ischemic stroke. It is designed for patients aged ≥18 years who had ischemic stroke within 7 days of symptom onset.
 
-# ==========================
-# Results Summary Section
-# ==========================
+    **Q: What does it do?**
 
-# Only show SHAP visualizations if prediction was made
-if st.session_state.predict:
-    # Add a divider and section header for clarity
+    A: With the 8 features you provide, we will quickly estimate <font color='red'>**your risk of mortality after ischemic stroke**</font> and use clear charts to show how each feature affects the result.
+
+    **Q: How do I use it?**
+
+    A: Fill in the patient's clinical features and click the predict button to get the result.
+
+    **Q: Can I trust the number?**
+
+    A: The model was trained on thousands of real records, but bodies vary. <font color='red'>**It's a reference, not a verdict**</font>—bring it to your doctor for discussion.
+    """, unsafe_allow_html=True)
     st.markdown("---")
-    st.subheader("Results Summary")
+    
+    # Main Page: Input controls
+    st.header("Input Clinical Features")
 
-    # Explain what SHAP values represent with clear bullet points
-    st.markdown("**SHAP values show how each feature influences the prediction:**")
-    st.markdown("- Red bars/areas: Features that increase mortality risk")
-    st.markdown("- Blue bars/areas: Features that decrease mortality risk")
-    st.markdown("- Length/intensity: Magnitude of feature's influence")
+    # Add a reset button using session state
+    if st.button('Reset Inputs'):
+        # Reset all input fields to their default values (0)
+        for feature in FEATURE_CONFIGS:
+            st.session_state[f"{feature}_input"] = FEATURE_CONFIGS[feature]['value']
+        st.session_state.predict = False
+        st.rerun()
 
-    # Display SHAP force plot - shows feature contributions for this specific prediction
-    try:
-        # Validate that SHAP values match the number of features
-        if shap_used.shape[1] != len(FEATURES):
-            st.warning(f"SHAP values shape ({shap_used.shape[1]}) doesn't match feature count ({len(FEATURES)}). Using available features.")
+    # Create two columns in the main page for better organization
+    col1, col2 = st.columns([5, 5], gap="large")
+
+    input_values = {}
+
+    # Group features into logical categories
+    laboratory_features = ['D-dimer', 'AG', 'WBC', 'NSE', 'Glucose']
+    clinical_features = ['Age', 'NIHSS', 'Time']
+
+    # Add section headers
+    for feature in laboratory_features:
+        cfg = FEATURE_CONFIGS[feature]
+        
+        # Define labels with specific units as required
+        if feature == 'D-dimer':
+            label = "D-dimer, mg/L"
+        elif feature == 'AG':
+            label = "The albumin to globulin ratio (AG), %"
+        elif feature == 'WBC':
+            label = "White blood cell count (WBC), 10^9/L"
+        elif feature == 'NSE':
+            label = "Neuron-specific enolase (NSE), ng/mL"
+        elif feature == 'Glucose':
+            label = "Fasting blood glucose, mmol/L"
+        else:
+            label = feature
+        
+        # Determine which column to place the feature in
+        with (col1 if feature in ['D-dimer', 'WBC', 'Glucose'] else col2):
+            if cfg['kind'] == 'float':
+                input_values[feature] = st.number_input(
+                    label=label,
+                    min_value=float(cfg['min']),
+                    max_value=float(cfg['max']),
+                    # Removed value parameter to fix Streamlit warning
+                    step=float(cfg['step']),
+                    format=cfg.get('fmt', "%.2f"),
+                    help=FEATURE_DESCRIPTIONS[feature],
+                    key=f"{feature}_input"
+                )
+            else:
+                input_values[feature] = st.number_input(
+                    label=label,
+                    min_value=int(cfg['min']),
+                    max_value=int(cfg['max']),
+                    # Removed value parameter to fix Streamlit warning
+                    step=int(cfg['step']),
+                    help=FEATURE_DESCRIPTIONS[feature],
+                    key=f"{feature}_input"
+                )
+
+    for feature in clinical_features:
+        cfg = FEATURE_CONFIGS[feature]
+        
+        # Define labels with specific units as required
+        if feature == 'Age':
+            label = "Age, years"
+        elif feature == 'NIHSS':
+            label = "NIHSS score at baseline"
+        elif feature == 'Time':
+            label = "Time from onset to hospitalization, hours"
+        else:
+            label = feature
+        
+        with (col1 if feature in ['Age'] else col2):
+            if cfg['kind'] == 'float':
+                input_values[feature] = st.number_input(
+                    label=label,
+                    min_value=float(cfg['min']),
+                    max_value=float(cfg['max']),
+                    # Removed value parameter to fix Streamlit warning
+                    step=float(cfg['step']),
+                    format=cfg.get('fmt', "%.2f"),
+                    help=FEATURE_DESCRIPTIONS[feature],
+                    key=f"{feature}_input"
+                )
+            else:
+                input_values[feature] = st.number_input(
+                    label=label,
+                    min_value=int(cfg['min']),
+                    max_value=int(cfg['max']),
+                    # Removed value parameter to fix Streamlit warning
+                    step=int(cfg['step']),
+                    help=FEATURE_DESCRIPTIONS[feature],
+                    key=f"{feature}_input"
+                )
+
+    # Add predict button in main page
+    st.markdown("---")
+    if st.button("Predict", type="primary", use_container_width=True):
+        # Validate input values before proceeding to results page
+        validation_error = False
+        for feature, value in input_values.items():
+            cfg = FEATURE_CONFIGS[feature]
+            if cfg['kind'] == 'float':
+                min_val = float(cfg['min'])
+                max_val = float(cfg['max'])
+            else:
+                min_val = int(cfg['min'])
+                max_val = int(cfg['max'])
             
-        # Create and display the SHAP force plot
-        # This plot shows how each feature pushes the prediction from the base value
-        st_shap(shap.force_plot(
-            base_value=base_value,                     # Average model output
-            shap_values=shap_used[0, :],               # SHAP values for current prediction
-            features=sample_df.iloc[0, :],             # Actual feature values
-            feature_names=FEATURES,                    # Feature names for display
-            show=False                                 # Don't show plot immediately
-        ), height=220)
+            if value < min_val:
+                st.error(f"{feature} value cannot be less than {min_val}, please re-enter!")
+                validation_error = True
+            elif value > max_val:
+                st.error(f"{feature} value cannot be greater than {max_val}, please re-enter!")
+                validation_error = True
         
-        # Display waterfall plot - shows feature contributions in descending order
-        st.markdown("### Waterfall Plot")
+        if not validation_error:
+            # Create DataFrame from input values and store in session state
+            sample_df = pd.DataFrame([input_values], columns=FEATURES)
+            st.session_state.sample_df = sample_df
+            st.session_state.predict = True
+            st.session_state.current_page = 'results'
+            st.rerun()
+
+elif st.session_state.current_page == 'results':
+    # Only show prediction results if predict button was clicked and we're on results page
+    if st.session_state.predict:
+        # Get the sample_df from session state
+        if 'sample_df' in st.session_state:
+            sample_df = st.session_state.sample_df
+        else:
+            st.error("No input data found. Please return to the input page and try again.")
+            st.stop()
         
-        # Fix font display issues for negative values
-        plt.rcParams['font.family'] = 'DejaVu Sans'
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # Create a new figure with smaller size and constrained layout to avoid warnings
-        fig, ax = plt.subplots(figsize=(5, 3), constrained_layout=True)
+        # Use a spinner to show processing status
+        with st.spinner('Processing input features and generating prediction...'):
+            # Preprocess features for prediction
+            X_model_df = preprocess_features(sample_df, model, scaler)
+            
+            # Generate SHAP explanations
+            base_value, shap_used = generate_shap_explanations(model, X_model_df, sample_df)
+
+        # Make prediction and display results
+        st.subheader("Prediction Result")
         
         try:
-            # Create SHAP Explanation object for waterfall plot
-            # This object contains all necessary data for visualization
-            shap_explanation = shap.Explanation(
-                values=shap_used[0, :],               # SHAP values
-                base_values=base_value,               # Base (expected) value
-                data=sample_df.iloc[0, :].values,     # Original feature values
-                feature_names=FEATURES                # Feature names
-            )
+            # Validate model has predict_proba method
+            if not hasattr(model, 'predict_proba'):
+                # Fallback for models without predict_proba (e.g., some SVMs)
+                prediction = model.predict(X_model_df)[0]
+                mortality_prob = 100.0 if prediction == 1 else 0.0
+                st.warning("Model doesn't support probability prediction. Showing binary result.")
+            else:
+                proba = model.predict_proba(X_model_df)[0]
+                if len(proba) < 2:
+                    st.error("Model prediction output format is unexpected. Expected at least 2 classes.")
+                    st.stop()
+                mortality_prob = float(proba[1]) * 100.0
             
-            # Generate waterfall plot showing top feature contributions
-            # max_display: Shows up to 10 most influential features
-            shap.plots.waterfall(
-                shap_explanation,
-                show=False,
-                max_display=10
-            )
+            # Ensure probability is within valid range
+            mortality_prob = max(0.0, min(100.0, mortality_prob))
             
-            # Display the plot in Streamlit
-            st.pyplot(fig)
+            # Display results according to new layout requirements
+            st.markdown(f"**Based on feature values, your predicted possiblity of mortality after ischemic stroke is {mortality_prob:.2f}%.**")
+            
+            # Add risk assessment message based on probability
+            if mortality_prob >= 50:
+                st.markdown("You may have a <font color='red'>**high risk**</font> of mortality after ischemic stroke—seek medical help immediately and ensure close monitoring!", unsafe_allow_html=True)
+            else:
+                st.markdown("Congratulations—your risk of mortality is <font color='red'>**low**</font>. Please continue to follow your doctor's rehabilitation plan closely!", unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
+            st.stop()
+
+        # ==========================   
+        # Results Summary Section      
+        # ==========================   
+
+        # Explain what SHAP values represent with clear bullet points
+        st.markdown("**SHAP values show how each feature influences the prediction:**")
+        st.markdown("- Red bars/areas: Features that increase mortality risk")
+        st.markdown("- Blue bars/areas: Features that decrease mortality risk")
+        st.markdown("- Length/intensity: Magnitude of feature's influence")
+
+        # Display SHAP force plot - shows feature contributions for this specific prediction
+        try:
+            # Validate that SHAP values match the number of features
+            if shap_used.shape[1] != len(FEATURES):
+                st.warning(f"SHAP values shape ({shap_used.shape[1]}) doesn't match feature count ({len(FEATURES)}). Using available features.")
+                
+            # Create and display the SHAP force plot
+            # This plot shows how each feature pushes the prediction from the base value
+            st_shap(shap.force_plot(
+                base_value=base_value,                     # Average model output
+                shap_values=shap_used[0, :],               # SHAP values for current prediction
+                features=sample_df.iloc[0, :],             # Actual feature values
+                feature_names=FEATURES,                    # Feature names for display
+                show=False                                 # Don't show plot immediately
+            ), height=220)
+            
+            # Display waterfall plot - shows feature contributions in descending order
+            st.markdown("### Waterfall Plot")
+            
+            # Create columns to limit the width of the waterfall plot
+            col1, col2 = st.columns([0.6, 0.4])
+            
+            with col1:
+                # Fix font display issues for negative values
+                plt.rcParams['font.family'] = 'DejaVu Sans'
+                plt.rcParams['axes.unicode_minus'] = False
+                
+                # Create a new figure with smaller size and constrained layout to avoid warnings
+                fig, ax = plt.subplots(figsize=(4, 2.5), constrained_layout=True)
+                
+                try:
+                    # Create SHAP Explanation object for waterfall plot
+                    # This object contains all necessary data for visualization
+                    shap_explanation = shap.Explanation(
+                        values=shap_used[0, :],               # SHAP values
+                        base_values=base_value,               # Base (expected) value
+                        data=sample_df.iloc[0, :].values,     # Original feature values
+                        feature_names=FEATURES                # Feature names
+                    )
+                    
+                    # Generate waterfall plot showing top feature contributions
+                    # max_display: Shows up to 8 most influential features for better fit
+                    shap.plots.waterfall(
+                        shap_explanation,
+                        show=False,
+                        max_display=8
+                    )
+                    
+                    # Display the plot in Streamlit
+                    st.pyplot(fig)
+                except Exception as inner_e:
+                    # Handle errors specific to waterfall plot generation
+                    st.error(f"Waterfall plot failed: {inner_e}")
+                finally:
+                    # Explicitly close the figure to free memory
+                    plt.close(fig)
+            
+        # Handle general visualization
+        except Exception as e:
+            st.error(f"Failed to display SHAP visualizations: {e}")
+            # Provide helpful information for troubleshooting
+            st.info("For detailed model explanation, ensure SHAP is properly installed and compatible with your model.")
         
-        except Exception as inner_e:
-            # Handle errors specific to waterfall plot generation
-            st.error(f"Waterfall plot failed: {inner_e}")
-        finally:
-            # Explicitly close the figure to free memory
-            plt.close(fig)
-            
-    # Handle general visualization
-    except Exception as e:
-        st.error(f"Failed to display SHAP visualizations: {e}")
-        # Provide helpful information for troubleshooting
-        st.info("For detailed model explanation, ensure SHAP is properly installed and compatible with your model.")
+        # Add a back button to return to input page
+        st.markdown("---")
+        if st.button("Back to Input Page", use_container_width=True):
+            st.session_state.current_page = 'input'
+            st.session_state.predict = False
+            # Keep the input values in session state so they're preserved when returning
+            st.rerun()
 
 # Add a "How to Use" section to sidebar
 st.sidebar.markdown("---")
