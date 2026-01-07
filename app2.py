@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Mortality Risk Predictor with SHAP Explanations
+Mortality Risk Predictor for Acute Ischemic Stroke with SHAP Explanations
 ==============================================
 
 This Streamlit application predicts patient mortality risk based on 8 clinical features
@@ -57,7 +57,7 @@ import streamlit.components.v1 as components
 
 # Configuration and Setup
 st.set_page_config(
-    page_title="Mortality Risk Predictor",
+    page_title="Mortality Risk Predictor for Acute Ischemic Stroke",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -67,7 +67,7 @@ st.cache_resource.clear()
 plt.rcParams['font.family'] = 'SimHei'
 
 # App title and description with Q&A format
-st.title("🩺 Mortality Risk Predictor")
+st.title("🩺 Mortality Risk Predictor for Acute Ischemic Stroke")
 st.markdown("---")
 
 # ==========================
@@ -543,14 +543,9 @@ elif st.session_state.current_page == 'results':
             # Ensure probability is within valid range
             mortality_prob = max(0.0, min(100.0, mortality_prob))
             
-            # Display results according to new layout requirements
-            st.markdown(f"**Based on feature values, your predicted possiblity of mortality after ischemic stroke is {mortality_prob:.2f}%.**")
-            
-            # Add risk assessment message based on probability
-            if mortality_prob >= 50:
-                st.markdown("You may have a <font color='red'>**high risk**</font> of mortality after ischemic stroke—seek medical help immediately and ensure close monitoring!", unsafe_allow_html=True)
-            else:
-                st.markdown("Congratulations—your risk of mortality is <font color='red'>**low**</font>. Please continue to follow your doctor's rehabilitation plan closely!", unsafe_allow_html=True)
+            # Display results according to new layout requirements with color-coded probability
+            color = "red" if mortality_prob >= 50 else "green"
+            st.markdown(f"<div style='font-size: 1.2em;'><strong>Based on feature values, your predicted possiblity of mortality after ischemic stroke is <font color='{color}'>{mortality_prob:.2f}%</font>.</strong></div>", unsafe_allow_html=True)
             
         except Exception as e:
             st.error(f"Prediction failed: {e}")
@@ -561,10 +556,10 @@ elif st.session_state.current_page == 'results':
         # ==========================   
 
         # Explain what SHAP values represent with clear bullet points
-        st.markdown("**SHAP values show how each feature influences the prediction:**")
-        st.markdown("- Red bars/areas: Features that increase mortality risk")
-        st.markdown("- Blue bars/areas: Features that decrease mortality risk")
-        st.markdown("- Length/intensity: Magnitude of feature's influence")
+        #st.markdown("**SHAP values show how each feature influences the prediction:**")
+        #st.markdown("- Red bars/areas: Features that increase mortality risk")
+        #st.markdown("- Blue bars/areas: Features that decrease mortality risk")
+        #st.markdown("- Length/intensity: Magnitude of feature's influence")
 
         # Display SHAP force plot - shows feature contributions for this specific prediction
         try:
@@ -572,21 +567,9 @@ elif st.session_state.current_page == 'results':
             if shap_used.shape[1] != len(FEATURES):
                 st.warning(f"SHAP values shape ({shap_used.shape[1]}) doesn't match feature count ({len(FEATURES)}). Using available features.")
                 
-            # Create and display the SHAP force plot
-            # This plot shows how each feature pushes the prediction from the base value
-            st_shap(shap.force_plot(
-                base_value=base_value,                     # Average model output
-                shap_values=shap_used[0, :],               # SHAP values for current prediction
-                features=sample_df.iloc[0, :],             # Actual feature values
-                feature_names=FEATURES,                    # Feature names for display
-                show=False                                 # Don't show plot immediately
-            ), height=220)
-            
-            # Display waterfall plot - shows feature contributions in descending order
-            st.markdown("### Waterfall Plot")
-            
+
             # Create columns to limit the width of the waterfall plot
-            col1, col2 = st.columns([0.6, 0.4])
+            col1, col2 = st.columns([0.5, 0.5])
             
             with col1:
                 # Fix font display issues for negative values
@@ -628,6 +611,12 @@ elif st.session_state.current_page == 'results':
             st.error(f"Failed to display SHAP visualizations: {e}")
             # Provide helpful information for troubleshooting
             st.info("For detailed model explanation, ensure SHAP is properly installed and compatible with your model.")
+        
+        # Add risk assessment message based on probability after the plot
+        if mortality_prob >= 50:
+            st.markdown("<div style='font-size: 1.2em;'>You may have a <font color='red'><strong>high risk</strong></font> of mortality after ischemic stroke—seek medical help immediately and ensure close monitoring!</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='font-size: 1.2em;'>Congratulations—your risk of mortality is <font color='green'><strong>low</strong></font>. Please continue to follow your doctor's rehabilitation plan closely!</div>", unsafe_allow_html=True)
         
         # Add a back button to return to input page
         st.markdown("---")
